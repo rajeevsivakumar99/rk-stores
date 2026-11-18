@@ -1,0 +1,32 @@
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Next.js build output
+.next/
+out/
+dist/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Deployment
+.vercel/
+.netlify/
+
+# OS files
+.DS_Store
+Thumbs.db
