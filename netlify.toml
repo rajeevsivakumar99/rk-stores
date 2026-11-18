@@ -1,0 +1,4 @@
+[build.environment]
+  # Public email display name and Web Push contact URI, not credentials.
+  # All other environment variables remain covered by secrets scanning.
+  SECRETS_SCAN_OMIT_KEYS = "EMAIL_FROM_NAME,VAPID_SUBJECT"
