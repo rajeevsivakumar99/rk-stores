@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getSettings, getTimings } from "@/lib/data";
 import { DAYS, fmtTime, waLink } from "@/lib/util";
 
@@ -19,6 +20,7 @@ export default async function Footer() {
             {s?.maps_link && <a href={s.maps_link} target="_blank" rel="noopener noreferrer" className={`${row} underline`}>Open in Google Maps</a>}
             {s?.contact_number && <a href={`tel:${s.contact_number}`} className={row}>📞 {s.contact_number}</a>}
             {s?.email && <a href={`mailto:${s.email}`} className={`${row} break-all`}>✉️ {s.email}</a>}
+            <Link href="/feedback" className={`${row} underline`}>💬 Send us feedback</Link>
           </div>
           <div className="text-sm">
             <h3 className="mb-2 font-semibold text-white">Shop timings</h3>

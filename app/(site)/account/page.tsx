@@ -16,6 +16,7 @@ export default async function Account() {
       <h1 className="text-xl font-bold md:text-2xl">My account</h1>
       <div className="grid grid-cols-2 gap-2">
         <Link href="/notifications" className="btn-outline">🔔 Notifications</Link>
+        <Link href="/feedback" className="btn-outline">💬 Send feedback</Link>
         {isAdminRole(profile?.role) ? <Link href="/admin" className="btn-outline">⚙️ Admin panel</Link> : <Link href="/offers" className="btn-outline">🏷️ Offers</Link>}
       </div>
       <form action={updateProfile} className="card space-y-3">

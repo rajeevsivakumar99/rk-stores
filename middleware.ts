@@ -26,7 +26,7 @@ export async function middleware(req: NextRequest) {
   if (p === "/admin/login") return go("/login", "/admin");
 
   const isAdminArea = p === "/admin" || p.startsWith("/admin/");
-  const needsLogin = isAdminArea || p.startsWith("/account") || p.startsWith("/notifications") || p.startsWith("/cart");
+  const needsLogin = isAdminArea || p.startsWith("/account") || p.startsWith("/notifications") || p.startsWith("/cart") || p.startsWith("/feedback");
   if (needsLogin && !user) return go("/login", p);
   // An unconfirmed email account must verify first (phone-password accounts are created already confirmed).
   if (needsLogin && user && !user.email_confirmed_at && !user.phone_confirmed_at) return go("/login");

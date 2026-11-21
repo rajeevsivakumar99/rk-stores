@@ -14,8 +14,13 @@ ${n.image_url ? `<img src="${esc(n.image_url)}" alt="" style="max-width:100%;bor
 <hr style="border:none;border-top:1px solid #eee"><p style="color:#888;font-size:12px">${esc(store)}${site ? ` · <a href="${esc(site)}">${esc(site)}</a>` : ""}</p></div>`;
 }
 
-/** Deliver a notification to all customers on its channels. Idempotent: users who already have a delivery row are skipped. */
-export async function dispatch(notificationId: string) {
+/**
+ * Deliver a notification on its channels. By default it goes to all customers; pass `roles` to target other accounts
+ * (the sales reminders and feedback alerts use ["admin","super_admin"]) and `url` for where a push notification opens.
+ * Idempotent: users who already have a delivery row are skipped.
+ */
+export const ADMIN_ROLES = ["admin", "super_admin"];
+export async function dispatch(notificationId: string, opts: { roles?: string[]; url?: string } = {}) {
   const db = supabaseAdmin();
   const { data: n } = await db.from("notifications").select("*").eq("id", notificationId).single();
   if (!n) throw new Error("Notification not found");
@@ -23,7 +28,7 @@ export async function dispatch(notificationId: string) {
   const store = settings?.store_name ?? "RK Stores";
   const channels: string[] = n.channels ?? [];
 
-  const { data: users } = await db.from("profiles").select("id,email,notification_preferences(in_app,email,push)").eq("role", "customer");
+  const { data: users } = await db.from("profiles").select("id,email,notification_preferences(in_app,email,push)").in("role", opts.roles ?? ["customer"]);
   const pref = (u: any) => (Array.isArray(u.notification_preferences) ? u.notification_preferences[0] : u.notification_preferences) ?? {};
   const { data: existing } = await db.from("notification_deliveries").select("user_id,channel").eq("notification_id", n.id);
   const seen = new Set((existing ?? []).map((r: any) => `${r.user_id}:${r.channel}`));
@@ -53,7 +58,7 @@ export async function dispatch(notificationId: string) {
     const { data: subs } = await db.from("push_subscriptions").select("*").in("user_id", targets.map((u) => u.id));
     const byUser = new Map<string, any[]>();
     (subs ?? []).forEach((s: any) => byUser.set(s.user_id, [...(byUser.get(s.user_id) ?? []), s]));
-    const payload = JSON.stringify({ title: n.title, body: n.message.slice(0, 180), url: "/notifications" });
+    const payload = JSON.stringify({ title: n.title, body: n.message.slice(0, 180), url: opts.url ?? "/notifications" });
     const dead: string[] = [];
     for (const [userId, userSubs] of byUser) {
       let ok = false; let err = "";
@@ -81,4 +86,15 @@ export async function createAndDispatch(
   const { data, error } = await db.from("notifications").insert(fields).select("id").single();
   if (error) throw new Error(error.message);
   return dispatch(data.id);
+}
+
+/** Creates a notification and delivers it to admin accounts only (never to customers). */
+export async function notifyAdmins(
+  db: ReturnType<typeof supabaseAdmin>,
+  fields: { title: string; message: string; type: string; channels: string[]; url?: string; dedupe_key?: string }
+) {
+  const { url, ...row } = fields;
+  const { data, error } = await db.from("notifications").insert(row).select("id").single();
+  if (error) throw new Error(error.message);
+  return dispatch(data.id, { roles: ADMIN_ROLES, url });
 }

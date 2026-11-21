@@ -1,0 +1,2 @@
+# Only needed for the optional device tests in tests/responsive_test.py (setup.bat can create the venv for you).
+playwright>=1.40

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/ui";
 import { money, fmtDateTime } from "@/lib/util";
+import { getSalesStatus } from "@/lib/sales-reminders";
+import { fmtLeft } from "@/lib/sales-logic";
 
 export default async function Dashboard() {
   const sb = supabaseServer();
@@ -29,6 +31,13 @@ export default async function Dashboard() {
     count("orders", (q) => q.eq("status", "pending")),
   ]);
 
+  // Today's sales + feedback (these quietly show nothing if migration 003 has not been run yet).
+  const salesStatus = await getSalesStatus(sb).catch(() => null);
+  const { data: todaySale } = salesStatus
+    ? await sb.from("daily_sales").select("gpay_amount,cash_amount,total_amount").eq("sale_date", salesStatus.date).maybeSingle()
+    : { data: null };
+  const { count: newFeedback } = await sb.from("feedback").select("*", { count: "exact", head: true }).eq("status", "new");
+
   const stats: [string, number | string, string?][] = [
     ["Total products", totalProducts],
     ["Total orders", totalOrders],
@@ -39,6 +48,7 @@ export default async function Dashboard() {
     ["Customers", customers],
     ["Active offers", activeOffers],
     ["Pending orders", pendingOrders, "text-amber-600"],
+    ["New feedback", newFeedback ?? 0, "text-brand-700"],
   ];
 
   return (
@@ -49,7 +59,24 @@ export default async function Dashboard() {
         <Link href="/admin/orders" className="btn-outline">📦 Manage orders</Link>
         <Link href="/admin/notifications" className="btn-outline">📣 Send announcement</Link>
         <Link href="/admin/coupons" className="btn-outline">🎟️ Coupons</Link>
+        <Link href="/admin/sales" className="btn-outline">💰 Daily sales</Link>
+        <Link href="/admin/sales/analytics" className="btn-outline">📊 Sales analytics</Link>
       </div>
+      {salesStatus && (
+        <Link href="/admin/sales" className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border p-4 transition hover:shadow-soft ${todaySale ? "border-green-200 bg-green-50" : salesStatus.shopDay ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
+          {todaySale ? (
+            <>
+              <div><p className="text-xs font-semibold uppercase tracking-wide text-green-700">Today&apos;s sales</p><p className="text-2xl font-extrabold text-green-900">{money(todaySale.total_amount)}</p></div>
+              <p className="text-sm text-green-800">GPay {money(todaySale.gpay_amount)} · Cash {money(todaySale.cash_amount)}</p>
+            </>
+          ) : (
+            <>
+              <div><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Today&apos;s sales</p><p className="font-bold text-amber-900">{salesStatus.shopDay ? "Not entered yet" : "Weekly off / holiday"}</p></div>
+              {salesStatus.shopDay && <p className="text-sm font-semibold text-amber-800">{salesStatus.minsLeft > 0 ? `${fmtLeft(salesStatus.minsLeft)} left - ` : ""}enter GPay + Cash →</p>}
+            </>
+          )}
+        </Link>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
         {stats.map(([l, v, c]) => (
           <div key={l} className="card !p-3"><p className="text-xs text-slate-500">{l}</p><p className={`text-2xl font-extrabold ${c ?? ""}`}>{typeof v === "number" ? v : v}</p></div>

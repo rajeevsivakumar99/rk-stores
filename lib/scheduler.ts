@@ -2,9 +2,9 @@ import { supabaseAdmin } from "./supabase/admin";
 import { dispatch } from "./notify";
 import { fmtTime } from "./util";
 
-const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+export const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
 
-function nowIn(tz: string) {
+export function nowIn(tz: string) {
   const p = Object.fromEntries(
     new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "short" })
       .formatToParts(new Date()).map((x) => [x.type, x.value])
