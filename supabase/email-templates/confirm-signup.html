@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light only">
+  <title>Verify your RK Stores account</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;">
+  <!-- Preview text shown next to the subject in the inbox list -->
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f1f5f9;">Tap the button to verify your email and activate your RK Stores account.</div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border-radius:16px;border:1px solid #e2e8f0;">
+
+          <!-- Brand header (bgcolor is the fallback for mail apps that ignore gradients) -->
+          <tr>
+            <td align="center" bgcolor="#4f46e5" style="background-color:#4f46e5;background-image:linear-gradient(135deg,#4338ca 0%,#4f46e5 55%,#7c3aed 100%);padding:28px 24px;border-radius:16px 16px 0 0;">
+              <img src="{{ .SiteURL }}/icon-192.png" width="64" height="64" alt="RK Stores" style="display:block;border:0;border-radius:16px;margin:0 auto;">
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:28px;font-weight:bold;color:#ffffff;margin-top:12px;">RK Stores</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:32px 28px 8px 28px;font-family:Arial,Helvetica,sans-serif;color:#1e293b;">
+              <h1 style="margin:0 0 12px 0;font-size:22px;line-height:30px;color:#0f172a;">Verify your email address</h1>
+              <p style="margin:0 0 12px 0;font-size:16px;line-height:24px;">Hi there,</p>
+              <p style="margin:0;font-size:16px;line-height:24px;">Thanks for joining RK Stores! We need to confirm that this email address is yours before we activate your account. It takes one tap.</p>
+            </td>
+          </tr>
+
+          <!-- The button -->
+          <tr>
+            <td align="center" style="padding:24px 28px 8px 28px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
+                <tr>
+                  <td align="center" bgcolor="#4f46e5" style="background-color:#4f46e5;border-radius:12px;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;padding:16px 36px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:20px;font-weight:bold;letter-spacing:0.6px;color:#ffffff;text-decoration:none;border-radius:12px;">VERIFY EMAIL ADDRESS</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:16px 28px 8px 28px;font-family:Arial,Helvetica,sans-serif;color:#475569;">
+              <p style="margin:0 0 12px 0;font-size:14px;line-height:21px;">For your security this link can be used once and expires after 1 hour. If it has expired, open the RK Stores login page and ask for a new verification email.</p>
+              <p style="margin:0;font-size:14px;line-height:21px;">Didn&rsquo;t create an RK Stores account? You can safely ignore this email. Nothing will be activated.</p>
+            </td>
+          </tr>
+
+          <!-- Help if the button doesn't work -->
+          <tr>
+            <td style="padding:16px 28px 28px 28px;font-family:Arial,Helvetica,sans-serif;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
+                <tr>
+                  <td style="padding:14px 16px;font-size:13px;line-height:20px;color:#64748b;">
+                    <strong style="color:#334155;">Button not working?</strong> Copy this link and paste it into your browser&rsquo;s address bar:<br>
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="color:#4f46e5;word-break:break-all;">{{ .ConfirmationURL }}</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" bgcolor="#f8fafc" style="background-color:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 16px 16px;padding:18px 24px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#94a3b8;">
+              RK Stores &middot; <a href="{{ .SiteURL }}" target="_blank" style="color:#94a3b8;text-decoration:underline;">{{ .SiteURL }}</a><br>
+              This is an automatic message, please do not reply.
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

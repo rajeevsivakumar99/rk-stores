@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 const MAX_SIDE = 1200;
+const MAX_BYTES = 20 * 1024 * 1024;
 
 /** Shrinks big phone photos (often 3-8 MB) to ~200 KB before upload: faster uploads for admins and faster pages for customers. */
 async function shrink(file: File): Promise<{ blob: Blob; ext: string; type: string }> {
@@ -20,35 +21,78 @@ async function shrink(file: File): Promise<{ blob: Blob; ext: string; type: stri
   return keep;
 }
 
+/** Turns a raw upload failure into something an admin can act on. */
+function uploadMessage(e: unknown): string {
+  const m = (e as { message?: string } | null)?.message ?? "";
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return "You appear to be offline. Check your connection and try again.";
+  if (/failed to fetch|network|load failed/i.test(m)) return "Network problem while uploading. Check your connection and try again.";
+  if (/row-level security|not authorized|unauthorized|permission/i.test(m)) return "Upload not allowed. Please log in again as an admin and retry.";
+  if (/bucket.*not found/i.test(m)) return "The image storage bucket was not found in Supabase. Check your Storage buckets.";
+  return m ? `Could not upload the photo: ${m}` : "Could not upload the photo. Please try again.";
+}
+
+/**
+ * Photo picker for the admin forms. Two buttons:
+ *  - Take photo   -> opens the rear camera on phones/tablets (on a desktop browser it simply opens the file picker)
+ *  - Choose photo -> opens the gallery / file picker
+ * The uploaded image's public URL is submitted with the form through the hidden input named by `name`.
+ */
 export default function ImageUpload({ name, bucket, initial }: { name: string; bucket: "product-images" | "store-assets"; initial?: string | null }) {
   const [url, setUrl] = useState(initial ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const guard = useRef<HTMLInputElement>(null);
+
+  // While a photo is still uploading, block the surrounding form's Save button so the product is never saved without its new image.
+  useEffect(() => {
+    guard.current?.setCustomValidity(busy ? "Please wait until the photo finishes uploading." : "");
+  }, [busy]);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
+    const input = e.target;
+    const f = input.files?.[0];
+    input.value = ""; // lets the admin pick or take the same photo again after an error
     if (!f) return;
-    if (!f.type.startsWith("image/") || f.size > 20 * 1024 * 1024) { setErr("Choose an image under 20 MB."); return; }
+    if (!f.type.startsWith("image/")) { setErr("That file is not an image. Please choose a photo."); return; }
+    if (f.size === 0) { setErr("That photo is empty. Please try again."); return; }
+    if (f.size > MAX_BYTES) { setErr("Choose an image under 20 MB."); return; }
     setBusy(true); setErr("");
-    const { blob, ext, type } = await shrink(f);
-    const sb = createClient();
-    const path = `${crypto.randomUUID()}.${ext}`;
-    const { error } = await sb.storage.from(bucket).upload(path, blob, { contentType: type, cacheControl: "31536000" });
-    if (error) setErr(error.message); else setUrl(sb.storage.from(bucket).getPublicUrl(path).data.publicUrl);
-    setBusy(false);
+    try {
+      const { blob, ext, type } = await shrink(f);
+      const sb = createClient();
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error } = await sb.storage.from(bucket).upload(path, blob, { contentType: type, cacheControl: "31536000" });
+      if (error) throw error;
+      setUrl(sb.storage.from(bucket).getPublicUrl(path).data.publicUrl);
+    } catch (x) {
+      setErr(uploadMessage(x));
+    } finally {
+      setBusy(false);
+    }
   }
+
+  const pick = `btn-outline cursor-pointer ${busy ? "pointer-events-none opacity-60" : ""}`;
   return (
     <div className="flex flex-wrap items-center gap-3">
       {url ? <img src={url} alt="" className="h-20 w-20 rounded-xl border object-cover" /> : <div className="h-20 w-20 rounded-xl border border-dashed bg-slate-50" />}
-      <div className="min-w-0 flex-1 space-y-1 text-sm">
-        <label className="btn-outline cursor-pointer">
-          {busy ? "Uploading…" : url ? "Change photo" : "Take / choose photo"}
-          <input type="file" accept="image/*" onChange={onFile} className="sr-only" disabled={busy} />
-        </label>
+      <div className="min-w-0 flex-1 space-y-2 text-sm">
+        <div className="flex flex-wrap gap-2">
+          <label className={pick}>
+            Take photo
+            <input type="file" accept="image/*" capture="environment" onChange={onFile} className="sr-only" disabled={busy} />
+          </label>
+          <label className={pick}>
+            Choose photo
+            <input type="file" accept="image/*" onChange={onFile} className="sr-only" disabled={busy} />
+          </label>
+        </div>
+        {busy && <p className="text-slate-500" role="status">Uploading…</p>}
         {err && <p className="text-red-600" role="alert">{err}</p>}
-        {url && <button type="button" className="touch-link block text-red-600 underline" onClick={() => setUrl("")}>Remove image</button>}
+        {url && !busy && <button type="button" className="touch-link block text-red-600 underline" onClick={() => setUrl("")}>Remove image</button>}
       </div>
       <input type="hidden" name={name} value={url} />
+      {/* Invisible validity guard (no name, never submitted): see the effect above. */}
+      <input ref={guard} type="text" tabIndex={-1} aria-hidden="true" autoComplete="off" defaultValue="" className="sr-only" />
     </div>
   );
 }

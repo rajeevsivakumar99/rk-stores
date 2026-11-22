@@ -3,7 +3,7 @@
 node_modules/
 .venv/
 venv/
-
+logs
 # Next.js build output
 .next/
 out/
