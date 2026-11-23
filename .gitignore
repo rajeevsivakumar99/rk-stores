@@ -30,3 +30,8 @@ pnpm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+logs/
+Valid Keys.txt
+*.zip
+rkstores/

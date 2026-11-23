@@ -10,25 +10,33 @@ const CartItem = z.object({
   quantity: z.coerce.number().int().min(1, "Quantity must be at least 1").max(99),
 });
 
+/**
+ * Finds the customer's cart, or creates it. Returns null (instead of crashing) when the cart tables are missing
+ * or the database refuses, for example when supabase/migrations/002 has not been run on this Supabase project.
+ */
+async function getOrCreateCart(sb: ReturnType<typeof supabaseServer>, userId: string) {
+  const found = await sb.from("carts").select("id, user_id, created_at").eq("user_id", userId).maybeSingle();
+  if (found.error) console.error("cart.lookup_failed", found.error.message);
+  if (found.data) return found.data as any;
+
+  const created = await sb.from("carts").insert({ user_id: userId }).select("id, user_id, created_at").single();
+  if (created.error || !created.data) {
+    console.error("cart.create_failed", created.error?.message);
+    return null;
+  }
+  return created.data as any;
+}
+
 /** Get (or create) the current user's cart with items and product details. */
 export async function getCart() {
   const sb = supabaseServer();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { cart: null, items: [] as any[] };
 
-  let cart: any = await sb
-    .from("carts")
-    .select("id, user_id, created_at")
-    .eq("user_id", user.id)
-    .maybeSingle()
-    .then((r: any) => r.data);
+  const cart = await getOrCreateCart(sb, user.id);
+  if (!cart) return { cart: null, items: [] as any[] };
 
-  if (!cart) {
-    const created = await sb.from("carts").insert({ user_id: user.id }).select().single();
-    cart = created.data;
-  }
-
-  const { data: items } = await sb
+  const { data: items, error } = await sb
     .from("cart_items")
     .select(`
       id, quantity, created_at,
@@ -36,6 +44,7 @@ export async function getCart() {
     `)
     .eq("cart_id", cart.id)
     .order("created_at", { ascending: true });
+  if (error) console.error("cart.items_failed", error.message);
 
   return { cart, items: items ?? [] };
 }
@@ -51,19 +60,16 @@ export async function addToCart(fd: FormData) {
 
   const { product_id, quantity } = p.data;
 
-  // Ensure cart exists
-  let cart: any = await sb.from("carts").select("id").eq("user_id", user.id).maybeSingle().then((r: any) => r.data);
-  if (!cart) {
-    const created = await sb.from("carts").insert({ user_id: user.id }).select().single();
-    cart = created.data;
-  }
+  // Ensure the cart exists
+  const cart = await getOrCreateCart(sb, user.id);
+  if (!cart) return fail("/products", "The cart is not available right now. Please try again in a moment.");
 
   // Check stock
   const { data: product } = await sb
     .from("products")
     .select("id, name, quantity, stock_status")
     .eq("id", product_id)
-    .single() as any;
+    .maybeSingle() as any;
   if (!product || product.stock_status === "out_of_stock") {
     return fail("/products", "This product is out of stock.");
   }
@@ -80,10 +86,12 @@ export async function addToCart(fd: FormData) {
     return fail("/products", `Only ${product.quantity} of "${product.name}" are in stock.`);
   }
 
-  if (existing) {
-    await sb.from("cart_items").update({ quantity: totalQty }).eq("id", existing.id);
-  } else {
-    await sb.from("cart_items").insert({ cart_id: cart.id, product_id, quantity });
+  const saved = existing
+    ? await sb.from("cart_items").update({ quantity: totalQty }).eq("id", existing.id)
+    : await sb.from("cart_items").insert({ cart_id: cart.id, product_id, quantity });
+  if (saved.error) {
+    console.error("cart.add_failed", saved.error.message);
+    return fail("/products", "Could not add this item to your cart. Please try again.");
   }
 
   revalidatePath("/cart");
@@ -111,8 +119,8 @@ export async function updateCartItem(fd: FormData) {
       product:products(id, name, quantity, stock_status)
     `)
     .eq("id", itemId)
-    .single() as any;
-  if (!item || item.cart.user_id !== user.id) {
+    .maybeSingle() as any;
+  if (!item || !item.cart || item.cart.user_id !== user.id || !item.product) {
     return fail("/cart", "Cart item not found.");
   }
   if (item.product.stock_status === "out_of_stock") {
@@ -122,7 +130,11 @@ export async function updateCartItem(fd: FormData) {
     return fail("/cart", `Only ${item.product.quantity} of "${item.product.name}" are in stock.`);
   }
 
-  await sb.from("cart_items").update({ quantity }).eq("id", itemId);
+  const { error } = await sb.from("cart_items").update({ quantity }).eq("id", itemId);
+  if (error) {
+    console.error("cart.update_failed", error.message);
+    return fail("/cart", "Could not update the cart. Please try again.");
+  }
   revalidatePath("/cart");
   return done("/cart", "Cart updated.");
 }
@@ -138,12 +150,16 @@ export async function removeFromCart(fd: FormData) {
     .from("cart_items")
     .select("id, cart:carts(user_id)")
     .eq("id", itemId)
-    .single() as any;
-  if (!item || item.cart.user_id !== user.id) {
+    .maybeSingle() as any;
+  if (!item || !item.cart || item.cart.user_id !== user.id) {
     return fail("/cart", "Cart item not found.");
   }
 
-  await sb.from("cart_items").delete().eq("id", itemId);
+  const { error } = await sb.from("cart_items").delete().eq("id", itemId);
+  if (error) {
+    console.error("cart.remove_failed", error.message);
+    return fail("/cart", "Could not remove the item. Please try again.");
+  }
   revalidatePath("/cart");
   return done("/cart", "Item removed from your cart.");
 }
@@ -155,7 +171,10 @@ export async function clearCart() {
   if (!user) return redirect("/login");
 
   const { data: cart } = await sb.from("carts").select("id").eq("user_id", user.id).maybeSingle();
-  if (cart) await sb.from("cart_items").delete().eq("cart_id", cart.id);
+  if (cart) {
+    const { error } = await sb.from("cart_items").delete().eq("cart_id", cart.id);
+    if (error) console.error("cart.clear_failed", error.message);
+  }
   revalidatePath("/cart");
   return done("/cart", "Cart cleared.");
 }
